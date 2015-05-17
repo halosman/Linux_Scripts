@@ -1,0 +1,69 @@
+#!/bin/bash
+# Program will start a docker container with the given user
+# Currently using the atmoz/sftp image
+
+user=
+host_dir=
+host_port=
+image_name=atmoz/sftp
+user_pass=
+user_id=
+user_pass_str=
+
+echo "Setting up docker image ${image_name} for SFTP"
+echo "First checking if docker image ${image_name} exists:"
+
+if [[ -z $(docker images | grep $image_name) ]]; then
+   echo "Image does not exist, continuing prompt"
+else
+   echo "Image already exists, please stop image if running and remove"
+   exit 3
+fi
+
+# Get User Name
+echo -n "Please Enter user Name > "
+read user
+user_id=$(id -u $user)
+
+echo -n "Please Enter Password > "
+read -s user_pass
+
+user_pass_str=$(echo -n $user_pass | makepasswd --crypt-md5 --clearfrom - | awk -v u=$user -v uid=$user_id '{print u":"$2":e:"uid}') 
+
+# Get Host Dir for FTP acess
+echo -n -e "\nPlease Enter host dir (will be chrooted) > "
+read host_dir
+
+if [ ! -d "$host_dir" ]; then
+   echo "Cannot find $host_dir on system, exiting"
+   exit 2
+fi
+
+echo -n "Please Enter desired port on host for this image > "
+read host_port
+
+echo "Test Command, Please check if it's correct"
+echo "docker run -v $host_dir:/home/$user/share -p $host_port:22 --name sftp --restart=always -d $image_name '$user_pass_str'"
+echo -n "Does this look correct (y/n) > "
+read str
+
+if [[ ! "$str" = "y" ]]; then
+   echo "Please invoke again to fix errors"
+   exit 1
+fi
+
+docker run \
+   -v ${host_dir}:/home/${user}/share \
+   -p ${host_port}:22 --name sftp --restart=always -d ${image_name} \
+  ${user_pass_str}
+unset user
+unset host_dir
+unset host_port
+unset image_name
+unset user_pass
+unset user_id
+unset user_pass_str
+unset str
+
+echo "Container has been started"
+exit 0

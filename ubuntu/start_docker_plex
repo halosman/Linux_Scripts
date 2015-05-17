@@ -1,0 +1,68 @@
+#!/bin/bash
+# Program will start a docker container with the given user
+# Currently using the timhaak/plex image
+
+host_data_dir=
+host_conf_dir=
+host_port=
+image_name=timhaak/plex
+
+echo "Setting up docker image ${image_name} for SFTP"
+echo "First checking if docker image ${image_name} exists:"
+
+if [[ -z $(docker ps -a | grep $image_name) ]]; then
+   echo "Image does not exist, continuing prompt"
+else
+   echo "Image already exists, please stop image if running and remove"
+   exit 3
+fi
+
+# Get Host Dir for Plex config
+echo -n -e "\nPlease Enter host dir To store the config files > "
+read host_conf_dir
+
+if [ ! -d "$host_conf_dir" ]; then
+   echo "Cannot find $host_conf_dir on system, exiting"
+   exit 2
+fi
+
+# Get Host Dir for Plex data 
+echo -n -e "\nPlease Enter host dir that contains the plex media files > "
+read host_data_dir
+
+if [ ! -d "$host_data_dir" ]; then
+   echo "Cannot find $host_data_dir on system, exiting"
+   exit 2
+fi
+
+echo -n "Please Enter desired port on host for this image > "
+read host_port
+
+echo "Test Command, Please check if it's correct"
+echo "docker run -h $HOSTNAME -v $host_conf_dir:/config -v $host_data_dir:/data -p $host_port:32400 --name plex --restart=always -d $image_name"
+echo -n "Does this look correct (y/n) > "
+read str
+
+if [[ ! "$str" = "y" ]]; then
+   echo "Please invoke again to fix errors"
+   exit 1
+fi
+
+docker run -h ${HOSTNAME} -v ${host_conf_dir}:/config -v ${host_data_dir}:/data -p ${host_port}:32400 --name plex-server --restart=always -d ${image_name}
+
+unset user
+unset host_data_dir
+unset host_conf_dir
+unset host_port
+unset image_name
+unset user_pass
+unset user_id
+unset user_pass_str
+unset str
+
+echo "Container plex-server has been run"
+echo "Please edit the file $data_conf_dir/Library/Application Support/Plex Media/Server/Preferences.xml"
+echo "by adding allowedNetworkd='192.168.1.0/255.255.255.0' as a parameter in the <Prefences > tag"
+echo "Obviously you need to change this if the network addresses are customized"
+echo "Please visit http://<hostname or ip-address of server>:${host_port}/web to set up"
+exit 0
