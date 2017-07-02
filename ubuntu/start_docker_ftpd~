@@ -6,7 +6,6 @@ user=
 host_dir=
 host_port=
 image_name=atmoz/sftp
-cont_name=sftp
 user_pass=
 user_id=
 user_pass_str=
@@ -14,16 +13,11 @@ user_pass_str=
 echo "Setting up docker image ${image_name} for SFTP"
 echo "First checking if docker image ${image_name} exists:"
 
-if [[ -z $(docker ps -a | grep $image_name) ]]; then
+if [[ -z $(docker images | grep $image_name) ]]; then
    echo "Image does not exist, continuing prompt"
 else
    echo "Image already exists, please stop image if running and remove"
    exit 3
-fi
-
-if [[ -z $(which makepasswd) ]]; then
-  echo "Please install makepasswd"
-  exit 5
 fi
 
 # Get User Name
@@ -34,7 +28,7 @@ user_id=$(id -u $user)
 echo -n "Please Enter Password > "
 read -s user_pass
 
-user_pass_str=$(echo -n $user_pass | makepasswd --crypt-md5 --clearfrom - | awk -F "$user_pass" '{print $2}' | sed 's/[ ][ ]*//' | awk -v u=$user -v uid=$user_id '{print u":"$1":e:"uid}') 
+user_pass_str=$(echo -n $user_pass | makepasswd --crypt-md5 --clearfrom - | awk -v u=$user -v uid=$user_id '{print u":"$2":e:"uid}') 
 
 # Get Host Dir for FTP acess
 echo -n -e "\nPlease Enter host dir (will be chrooted) > "
@@ -48,10 +42,8 @@ fi
 echo -n "Please Enter desired port on host for this image > "
 read host_port
 
-docker_cmd="docker run -v ${host_dir}:/home/${user}/share -p ${host_port}:22 --name ${cont_name} --restart=always -d ${image_name} ${user_pass_str}"
-
 echo "Test Command, Please check if it's correct"
-echo "$docker_cmd"
+echo "docker run -v $host_dir:/home/$user/share -p $host_port:22 --name sftp --restart=always -d $image_name '$user_pass_str'"
 echo -n "Does this look correct (y/n) > "
 read str
 
@@ -60,8 +52,10 @@ if [[ ! "$str" = "y" ]]; then
    exit 1
 fi
 
-$(eval "$docker_cmd")
-
+docker run \
+   -v ${host_dir}:/home/${user}/share \
+   -p ${host_port}:22 --name sftp --restart=always -d ${image_name} \
+  ${user_pass_str}
 unset user
 unset host_dir
 unset host_port
@@ -70,15 +64,6 @@ unset user_pass
 unset user_id
 unset user_pass_str
 unset str
-unset docker_cmd
 
-if [[ -z $(docker ps -f name="$cont_name" | grep "$cont_name") ]]; then
-    echo "Container is not running, something went wrong"
-    exit 4
-else
-    echo "Container has been started"
-fi
-
-# Write the command to a file to save for later
-echo "$docker_cmd" > ~/docker_start_ftpd.cmd
+echo "Container has been started"
 exit 0
